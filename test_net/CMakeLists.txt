@@ -6,4 +6,4 @@ set(CMAKE_CXX_STANDARD 11)
 
 add_executable(test_net main.cpp)
 
-target_link_libraries(test_net boost_system)
+target_link_libraries(test_net boost_system pthread)
