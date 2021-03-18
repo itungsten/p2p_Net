@@ -1,7 +1,8 @@
-#include <iostream>
-#include "seed.h"
+#include "Server.h"
 
 int main() {
-    seed().start();
+    boost::asio::io_service io;
+    Server server(io);
+    io.run();
     return 0;
 }

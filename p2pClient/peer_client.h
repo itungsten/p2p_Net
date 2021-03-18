@@ -6,6 +6,7 @@
 #define P2PNET_PEER_CLIENT_H
 
 #include "boost/asio.hpp"
+#include "../config.h"
 
 using namespace boost::asio;
 

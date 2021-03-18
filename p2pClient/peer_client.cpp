@@ -159,7 +159,7 @@ void peer_client::get_peer_list() {
     //1 创建套接字
     std::shared_ptr<ip::tcp::socket> p_socket=std::make_shared<ip::tcp::socket>(*p_io_service);
     //2 连接到seed节点 获取节点列表
-    ip::tcp::endpoint server_endp(ip::address_v4::from_string("127.0.0.1"),9400);
+    ip::tcp::endpoint server_endp(ip::address_v4::from_string("127.0.0.1"),SERVER_PORT);
     p_socket->async_connect(server_endp,[p_socket,this](boost::system::error_code ec) {
         if (ec) {
             printf("wrong:%s\n", ec.message().c_str());
