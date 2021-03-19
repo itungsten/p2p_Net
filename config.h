@@ -20,7 +20,7 @@
 #define MAIL_BUF 512
 #define MAIL_USER "1019205908@qq.com"
 #define MAIL_PASS "aydrcawbygssbgai"
-#define DEBUG false
+#define DEBUG true
 #define SERVER_PORT 666
 #define SERVER_ADDR "0.0.0.0"
 #define TIME_INTERVAL 6
@@ -28,5 +28,6 @@
 #define RECV_BUF_SIZE 512
 #define SEND_BUF_SIZE 512
 #define VERIFY_TIME 30
+#define LIST_SIZE 0x1000
 
 #endif //P2PNET_CONFIG_H

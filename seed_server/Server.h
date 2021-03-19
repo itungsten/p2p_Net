@@ -20,7 +20,7 @@ private:
         time_t lastTime;
         uint32_t hostAddr;
         uint16_t hostPort;
-        uint16_t verifyTime;
+        int verifyTime;
         int MAC;
         std::string email;
 
@@ -35,8 +35,9 @@ private:
         bool isActive()const{
             bool active=(time(0)-lastTime)<=TIME_LIMIT;
             std::string addr=socketPtr->remote_endpoint().address().to_string();
-            if(active)std::cout<<addr<<" is active\n";
-            else std::cout<<addr<<" isn't active";
+            auto port=socketPtr->remote_endpoint().port();
+            if(active)std::cout<<addr<<":"<<port<<" is active\n";
+            else std::cout<<addr<<":"<<port<<" isn't active";
             return active;
         }
         void update(){

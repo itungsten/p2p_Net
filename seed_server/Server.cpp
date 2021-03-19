@@ -19,7 +19,7 @@ void Server::startListen() {
             return;
         }
         addClient(socketPtr);
-        sendList(socketPtr);
+        //sendList(socketPtr);
         keepRead(socketPtr);
         //递归启动一个循环，等待下一个连接
         this->startListen();
@@ -74,19 +74,37 @@ void Server::readHandler(const boost::system::error_code& e,size_t bytes_transfe
         {
             //login    usage:l<space><your email>
             std::string email((*recvBuf).data()+2);
-            email=email.substr(0,email.length()-1);
+            email=email.substr(0,email.length());
             getClientBySocketPtr(socketPtr).sendMail(email);
+			char* bufPtr=new char[16];
+            sprintf(bufPtr,"\nEmail Sended!\n");
+            boost::asio::async_write(*socketPtr, boost::asio::buffer((void*)bufPtr, 16),\
+                    [this,bufPtr](const boost::system::error_code& e, std::size_t bytes_transferred){
+                    if(e) {
+                        if(DEBUG)printError(e);
+                    }
+                    delete[] bufPtr;
+            });
             break;
         }
         case 'p':
         {
             //password
             std::string MAC((*recvBuf).data()+2);
-            MAC=MAC.substr(0,MAC.length()-1);
+            MAC=MAC.substr(0,MAC.length());
             Client& client=getClientBySocketPtr(socketPtr);
             if(std::stoi(MAC)==client.MAC){
                 client.verifyTime=-1;
                 printf("\nUser %s has verified!\n",client.email.c_str());
+                char* bufPtr=new char[15];
+                sprintf(bufPtr,"\nCorrect MAC!\n");
+                boost::asio::async_write(*socketPtr, boost::asio::buffer((void*)bufPtr, 15),\
+                    [this,bufPtr](const boost::system::error_code& e, std::size_t bytes_transferred){
+                    if(e) {
+                        if(DEBUG)printError(e);
+                    }
+                    delete[] bufPtr;
+                });
             }
             else{
                 char* bufPtr=new char[13];
@@ -128,21 +146,26 @@ void Server::addClient(const std::shared_ptr<ip::tcp::socket>& socketPtr){
 }
 void Server::sendList(const std::shared_ptr<ip::tcp::socket>& socketPtr){
     //构造peer_list报文，将peer list 发送给客户端
-    // message_size | addr[4字节] | port[2字节] | addr[4字节] | port[2字节] ........
-    std::size_t bufLen= sizeof(std::size_t) + clients.size() * 6;
-    typedef unsigned char BYTE;
-    BYTE* bufPtr=new BYTE[bufLen];
-    BYTE* bufPtrBK=bufPtr;
-    *((std::size_t *)bufPtr)=bufLen;
+    // message_size | addr[4字节] | port[2字节] | email[30字节]........
+    std::size_t bufLen= sizeof(std::size_t) + clients.size() * 36;
+    std::size_t realLen = sizeof(std::size_t);
+    char* bufPtr=new char[bufLen];
+    char* bufPtrBK=bufPtr;
     bufPtr+=sizeof(std::size_t);
     for(const auto &iter:clients){
-        *((uint32_t *)bufPtr)=iter.hostAddr;
-        bufPtr+=sizeof(uint32_t);
-        *((uint16_t *)bufPtr)=iter.hostPort;
-        bufPtr+=sizeof(uint16_t);
+        if(iter.verifyTime<0){
+            *((uint32_t *)bufPtr)=iter.hostAddr;
+            bufPtr+=4;
+            *((uint16_t *)bufPtr)=iter.hostPort;
+            bufPtr+=2;
+            std::sprintf(bufPtr,"%s",iter.email.c_str());
+            bufPtr+=30;
+            realLen+=36;
+        }
     }
+    *((std::size_t *)bufPtr)=realLen;
 
-    boost::asio::async_write(*socketPtr, boost::asio::buffer((void*)bufPtrBK, bufLen),\
+    boost::asio::async_write(*socketPtr, boost::asio::buffer((void*)bufPtrBK, realLen),\
                     [bufPtrBK,socketPtr](const boost::system::error_code& error, std::size_t bytes_transferred){
         if(error) {
             if(DEBUG)printf("wrong: write data err: %s\n", error.message().c_str());

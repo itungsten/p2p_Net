@@ -1,5 +1,6 @@
-#include "peer_client.h"
+#include "peerClient.h"
 int main() {
-    peer_client().start_up();
+    boost::asio::io_service io;
+    peerClient(io).start();
     return 0;
 }
