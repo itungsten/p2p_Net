@@ -9,6 +9,7 @@
 #include <boost/bind/bind.hpp>
 #include <boost/thread/thread.hpp>
 #include "../config.h"
+#include "SM2Translator.h"
 
 
 using namespace boost::asio;
@@ -27,6 +28,7 @@ private:
     std::shared_ptr<ip::tcp::acceptor> acceptorPtr;//listen to peer
     boost::asio::steady_timer timer;    //for heartbeat
 
+    pair<string,string> key;
 
     void refreshList();
     void makeList(char* listBuf,size_t bytes_transferred);

@@ -23,10 +23,12 @@ private:
         int verifyTime;
         int MAC;
         std::string email;
+        std::string pubKey;
+        bool isOpen;
 
         std::shared_ptr<ip::tcp::socket> socketPtr;
         Client(uint32_t addr,uint16_t port,const std::shared_ptr<ip::tcp::socket>& ptr)
-        : hostAddr(addr),hostPort(port),lastTime(time(0)),socketPtr(ptr),verifyTime(VERIFY_TIME),MAC(rand())
+        : hostAddr(addr),hostPort(port),lastTime(time(0)),socketPtr(ptr),verifyTime(VERIFY_TIME),MAC(rand()),isOpen(false)
         {
         }
         bool operator==(const Client& o){
@@ -69,7 +71,13 @@ private:
         for(auto& iter:clients){
             if(iter.socketPtr==socketPtr)return iter;
         }
-        if(DEBUG)("\nClient Not Found!\n");
+        if(DEBUG)printf("\nClient Not Found!\n");
+    }
+    Client& getClientByMail(const std::string& email){
+        for(auto& iter:clients){
+            if(iter.email==email)return iter;
+        }
+        if(DEBUG)printf("\nClient Not Found!\n");
     }
 public:
     Server(boost::asio::io_service& io);

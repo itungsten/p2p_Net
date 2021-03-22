@@ -125,6 +125,41 @@ void Server::readHandler(const boost::system::error_code& e,size_t bytes_transfe
             sendList(socketPtr);
             break;
         }
+        case 'o':
+        {
+            //open
+            getClientBySocketPtr(socketPtr).isOpen= true;
+            break;
+        }
+        case 'c':
+        {
+            //close
+            getClientBySocketPtr(socketPtr).isOpen= false;
+            break;
+        }
+        case 's':
+        {
+            std::string email((*recvBuf).data()+2);
+            email=email.substr(0,email.length());
+            Client& client=getClientByMail(email);
+            Client& peer=getClientBySocketPtr(socketPtr);
+            if(client.isOpen){
+                char bufPtr[36];
+                *((uint32_t*)bufPtr)=peer.hostAddr;
+                *((uint16_t*)(bufPtr+4))=peer.hostPort;
+                std::sprintf(bufPtr+6,"%s",peer.email.c_str());
+                (*(client.socketPtr)).send(boost::asio::buffer((void*)bufPtr,36));
+                size_t bytes_transferred=(*(client.socketPtr)).read_some(boost::asio::buffer((void*)bufPtr,36));
+
+                uint16_t port=*((uint16_t*)bufPtr);
+                std::string addr(bufPtr+2);
+                if(DEBUG)std::cout<<"The new  acceptor addr is "<<addr<<" the port is "<<port<<std::endl;
+
+
+                (*socketPtr).send(boost::asio::buffer((void*)bufPtr,bytes_transferred));
+            }
+            break;
+        }
     }
     socketPtr->async_receive(boost::asio::buffer(*recvBuf),boost::bind(&Server::readHandler,this,boost::asio::placeholders::error,\
                                                                                 boost::asio::placeholders::bytes_transferred,socketPtr,recvBuf));
@@ -153,7 +188,7 @@ void Server::sendList(const std::shared_ptr<ip::tcp::socket>& socketPtr){
     char* bufPtrBK=bufPtr;
     bufPtr+=sizeof(std::size_t);
     for(const auto &iter:clients){
-        if(iter.verifyTime<0){
+        if(iter.verifyTime<0&&iter.isOpen){
             *((uint32_t *)bufPtr)=iter.hostAddr;
             bufPtr+=4;
             *((uint16_t *)bufPtr)=iter.hostPort;

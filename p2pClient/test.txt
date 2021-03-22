@@ -1,0 +1,1 @@
+g++ -g main.cpp SM2Translator.cpp utils.cpp test.cpp Socketor.cpp -o demo -L. -lssl -lcrypto

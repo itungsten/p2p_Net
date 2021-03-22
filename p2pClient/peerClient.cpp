@@ -3,10 +3,27 @@
 //
 #include <vector>
 #include <iostream>
+#include <fstream>
 #include "peerClient.h"
+
+static string readAll(ifstream& inFile){
+    string res;
+    char ch;
+    while(inFile.get(ch)){
+        res.push_back(ch);
+    }
+    return res;
+}
+std::size_t writeAll(ofstream& outFile,const string& buf){
+    size_t len=buf.size();
+    for(int i=0;i<len;++i)outFile.put(buf[i]);
+    return len;
+}
 peerClient::peerClient(boost::asio::io_service& io_service)
 :io(io_service),timer(io_service,boost::asio::chrono::seconds(TIME_INTERVAL))
 {
+    key=SM2Translator::GenKey();
+
     //    connect to server
     ip::tcp::endpoint serverEnd(ip::address_v4::from_string(SERVER_ADDR), SERVER_PORT);
     serverPtr=std::make_shared<ip::tcp::socket>(io);
@@ -69,7 +86,7 @@ void peerClient::sendFile() {
     char* bufPtr=(char*)recvBuf.c_str();
     uint16_t port=*((uint16_t*)bufPtr);
     std::string addr(bufPtr+sizeof(uint16_t));
-    if(DEBUG)std::cout<<"The remote addr is "<<addr<<" and the port is "<<port<<std::endl;
+//    if(DEBUG)std::cout<<"The remote addr is "<<addr<<" and the port is "<<port<<std::endl;
 
     try {
         ip::tcp::endpoint peerEnd(ip::address_v4::from_string(addr),port);
@@ -78,11 +95,28 @@ void peerClient::sendFile() {
         peerSocket.connect(peerEnd);;if(e){if(DEBUG)printError(e);return;}
         //connect to remote peer
 
-        std::cout<<"\nPlease input testMsg.\n>>>";
-        int len;std::cin>>len;
-        std::string testMsg;std::cin >> testMsg;
-        peerSocket.send(boost::asio::buffer(&len,sizeof(int)));  //len
-        peerSocket.send(boost::asio::buffer(testMsg.c_str(), len)); //body
+        char pubKeyBuf[179];
+        size_t bytes_transferred=boost::asio::read(peerSocket,boost::asio::buffer(pubKeyBuf,179));
+        string peerPubKey(pubKeyBuf);
+//        cout<<peerPubKey<<endl;
+        //receive public key
+
+        std::cout<<"\nPlease input filePath.\n>>>";
+        std::string filePath;std::cin >> filePath;
+        ifstream oriFile(filePath,ios::in|ios::binary);
+        string oriBody=readAll(oriFile);
+        oriFile.close();
+//        cout<<"Origin is "<<oriBody<<endl;
+//        cout<<oriBody.length()<<endl;
+//        cout<<peerPubKey.length()<<endl;
+        string encBody=SM2Translator::Encrypt(peerPubKey,oriBody);
+        int len=encBody.length();
+//        cout<<len;
+        char infoBuf[30 + sizeof(int)];
+        *((int*)infoBuf)=len;
+        sprintf(infoBuf+sizeof(int),"%s",filePath.c_str());
+        boost::asio::write(peerSocket,boost::asio::buffer(infoBuf,sizeof(infoBuf)));//len
+        boost::asio::write(peerSocket,boost::asio::buffer(encBody.c_str(), len)); //body
         peerSocket.close();
     }
     catch(const std::exception& e){
@@ -103,7 +137,7 @@ void peerClient::digHandler(const boost::system::error_code& e,std::size_t bytes
     inet_ntop(AF_INET, (void *) &addr_binary, (char*)addr_str.c_str(), 16);
     uint32_t portNum = *((uint16_t*)(recvBuf+4));
     std::string email_str(recvBuf+6);
-    if(DEBUG)std::cout<<"\n Remote peer's pubic info is "<<addr_str.c_str()<<":"<<portNum<<":"<<email_str<<"\n"<<std::flush;
+//    if(DEBUG)std::cout<<"\n Remote peer's pubic info is "<<addr_str.c_str()<<":"<<portNum<<":"<<email_str<<"\n"<<std::flush;
     boost::thread td(boost::bind(&peerClient::download,this));
 }
 void peerClient::download() {
@@ -113,7 +147,7 @@ void peerClient::download() {
         uint16_t port=acceptorPtr->local_endpoint().port();
         std::string addr =acceptorPtr->local_endpoint().address().to_string();
         *((uint16_t*)send_buf)=port;
-        if(DEBUG)std::cout<<"The new acceptor's addr is "<<addr<<" the port is "<<port<<std::endl;
+//        if(DEBUG)std::cout<<"The new acceptor's addr is "<<addr<<" the port is "<<port<<std::endl;
         sprintf(send_buf+2,"%s",addr.c_str());
         serverPtr->send(boost::asio::buffer(send_buf,2+addr.length()+1));
         //send to server to transmit
@@ -122,14 +156,26 @@ void peerClient::download() {
         acceptorPtr->accept(peerSocket);
         //connect to peer
 
+        size_t bytes_transferred=peerSocket.send(boost::asio::buffer(key.first.c_str(),179));
+
         int len;
-        size_t bytes_transferred=boost::asio::read(peerSocket,boost::asio::buffer(&len,sizeof(int)));
-        std::cout<<len;
-        std::cout<<bytes_transferred;
+        char infoBuf[30 + sizeof(len)];
+        bytes_transferred=boost::asio::read(peerSocket,boost::asio::buffer(infoBuf, sizeof(infoBuf)));
+        len=*((int* )infoBuf);
+//        std::cout<<len<<endl;
+//        std::cout<<bytes_transferred<<endl;
         char* fileBuf=new char[len];
         bytes_transferred=boost::asio::read(peerSocket,boost::asio::buffer(fileBuf,len));
-        std::cout<<bytes_transferred;
-        std::cout<<fileBuf<<std::endl;
+//        std::cout<<bytes_transferred<<endl;
+        string encBody(fileBuf,len);
+//        cout<<encBody.length();
+        string decBody=SM2Translator::Decrypt(key.second,encBody);
+        string oriName=(infoBuf+sizeof(int));
+        string recvName="recv_"+oriName;
+        ofstream decFile(recvName.c_str(), ios::out | ios ::binary);
+//        cout<<decBody<<endl;
+        writeAll(decFile,decBody);
+        decFile.close();
         delete [] fileBuf;
         acceptorPtr->close();
         peerSocket.close();
